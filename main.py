@@ -56,6 +56,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.btnBSC.clicked.connect(self.load_bsc_default)
         self.btnStart.clicked.connect(self.start_timer)
         self.listWidget.itemDoubleClicked.connect(self.select_to_precess)
+        self.sliderTrack.valueChanged.connect(self.check_track)
 
         self.timer_update = QTimer()
         self.download_weather()
@@ -68,7 +69,20 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.device = "AH"
         self.opd_device = AxisDevice.AxisControll(self.device, 'COM3', 9600)
         self.encDEC.setText('-22:32:04')
+        self.statDEC.setStyleSheet("background-color: lightgreen")
 
+    def check_track(self):
+        if self.sliderTrack.value() == 1:
+            try:
+                self.opd_device.sideral_ligar()
+            except Exception as e:
+                print(e)
+        elif self.sliderTrack.value() == 0:
+            try:
+                self.opd_device.sideral_desligar()
+            except Exception as e:
+                print(e)
+                
     def load_allsky(self):
         """load allsky images"""
         urlAS = QUrl("http://200.131.64.237:8090/onlycam340c") 
@@ -85,6 +99,9 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             ramObj = ([item.text().split("\t")[4].strip() for item in self.listWidget.selectedItems()])[0]
             decmObj = ([item.text().split("\t")[5].strip() for item in self.listWidget.selectedItems()])[0]
             self.set_precess(nameObj, raObj, decObj, magObj, ramObj, decmObj)
+            self.objName.setText(nameObj)
+            self.objRA.setText(raObj)
+            self.objDEC.setText(decObj)
             self.tabWidget_2.setCurrentIndex(1)
     
     def get_sidereal(self):
@@ -297,7 +314,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.statSecurity.setStyleSheet("background-color: lightgreen")
             else:
                 self.stat5.setStyleSheet("background-color: indianred")
-                self.statSecurity.setStyleSheet("background-color: indianred")
+                self.statSecurity.setStyleSheet("background-color: darkgreen")
             if statbuf[19] == "1":
                 self.stat6.setStyleSheet("background-color: lightgreen")
             else:
@@ -307,19 +324,19 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.statGross.setStyleSheet("background-color: lightgreen")
             else:
                 self.stat7.setStyleSheet("background-color: indianred")
-                self.statGross.setStyleSheet("background-color: indianred")
+                self.statGross.setStyleSheet("background-color: darkgreen")
             if statbuf[22] == "1":
                 self.stat8.setStyleSheet("background-color: lightgreen")
                 self.statGross.setStyleSheet("background-color: lightgreen")
             else:
                 self.stat8.setStyleSheet("background-color: indianred")
-                self.statGross.setStyleSheet("background-color: indianred")
+                self.statGross.setStyleSheet("background-color: darkgreen")
             if statbuf[23] == "1":
                 self.stat9.setStyleSheet("background-color: lightgreen")
                 self.statFine.setStyleSheet("background-color: lightgreen")
             else:
                 self.stat9.setStyleSheet("background-color: indianred")
-                self.statFine.setStyleSheet("background-color: indianred")
+                self.statFine.setStyleSheet("background-color: darkgreen")
             if statbuf[24] == "1":
                 self.stat10.setStyleSheet("background-color: lightgreen")
             else:
@@ -337,7 +354,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             else:
                 self.stat13.setStyleSheet("background-color: indianred")
             if statbuf[23] == "1" and statbuf[25] == "1":
-                self.statRA.setStyleSheet("background-color: indianred")
+                self.statRA.setStyleSheet("background-color: darkgreen")
             else:
                 self.statRA.setStyleSheet("background-color: lightgreen")
     

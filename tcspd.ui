@@ -3665,7 +3665,7 @@ INCLINATION</string>
     <property name="geometry">
      <rect>
       <x>870</x>
-      <y>0</y>
+      <y>10</y>
       <width>101</width>
       <height>31</height>
      </rect>
