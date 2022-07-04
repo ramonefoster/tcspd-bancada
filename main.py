@@ -17,6 +17,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from mplwidget import MplWidget
 
 from PyQt5 import QtCore, QtGui, QtWidgets, uic, QtWebEngineWidgets, QtTest
 from PyQt5.QtCore import QTimer, QDateTime, QObject, QThread, pyqtSignal, QUrl, pyqtSlot, Qt, QSettings, QThreadPool
@@ -50,13 +51,15 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         statbuf = None
         self.device = None
         self.opd_device = None
+        self.azimuth_cup = 0
+        self.graph_telescope()
 
         self.load_allsky()
         self.btnPrecess.clicked.connect(self.select_to_precess)
         self.btnBSC.clicked.connect(self.load_bsc_default)
         self.btnStart.clicked.connect(self.start_timer)
         self.listWidget.itemDoubleClicked.connect(self.select_to_precess)
-        self.sliderTrack.valueChanged.connect(self.check_track)
+        self.sliderTrack.sliderMoved.connect(self.check_track)
 
         self.timer_update = QTimer()
         self.download_weather()
@@ -67,17 +70,18 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.timer_update.stop()
         self.timer_update.start(1000)
         self.device = "AH"
-        self.opd_device = AxisDevice.AxisControll(self.device, 'COM3', 9600)
+        self.opd_device = AxisDevice.AxisControll(self.device, 'COM7', 9600)
         self.encDEC.setText('-22:32:04')
         self.statDEC.setStyleSheet("background-color: lightgreen")
+        self.statDome.setStyleSheet("background-color: lightgreen")
 
     def check_track(self):
-        if self.sliderTrack.value() == 1:
+        if self.sliderTrack.value() == 0:
             try:
                 self.opd_device.sideral_ligar()
             except Exception as e:
                 print(e)
-        elif self.sliderTrack.value() == 0:
+        elif self.sliderTrack.value() == 1:
             try:
                 self.opd_device.sideral_desligar()
             except Exception as e:
@@ -127,34 +131,13 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         sideral, utc = self.get_sidereal()
 
         #self.working_area(raObj, decObj, latitude, sideral)
-    
-    def mover_rel(self):
-        """fine movement by indexer"""
-        if "AH" in self.device:
-            dest_rel = self.txtIndexer.text()
-            if len(dest_rel) > 2:
-                self.opd_device.mover_rel(dest_rel)
-        if "DEC" in self.device:
-            dest_rel = self.txtIndexer_2.text()
-            if len(dest_rel) > 2:
-                self.opd_device.mover_rel(dest_rel)
 
     def stop(self):
         """stop any movement and abort slew"""
         try:
             self.opd_device.prog_parar()
-            if "AH" in self.device:
-                self.opd_device.sideral_desligar()
         except Exception as e:
             print(e)
-
-    def tracking(self):
-        """turns sidereal on and off"""
-        if "AH" in self.device and statbuf:
-            if statbuf[19] == "0":
-                self.opd_device.sideral_ligar()
-            elif statbuf[19] == "1":
-                self.opd_device.sideral_desligar()
 
     def precess(self):
         """precess coordinates based on FINALS"""
@@ -267,15 +250,25 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # #DATA
         self.get_status()
+        self.graph_telescope()
         if statbuf:            
             if "*" in statbuf:
-                ra = statbuf[0:11]
+                ha = statbuf[0:11]
                 dec = self.txtPointDEC.text()
-                self.encRA.setText(ra)
                 lat = '-22:32:04'
                 sideral, utc = self.get_sidereal()
+                self.encHA.setText(ha)
+                HA = util.HMSToHours(ha)
+                lst = util.HMSToHours(sideral)
+                ra = util.HoursToHMS((lst-HA), " ", " ", "", 2)
+                self.encRA.setText(ra)
+                
                 zenith, is_altitude_ok, azimuth_calc, observation_time, is_observable, \
                 is_pier_west, airmass = Telescope.PointCalculations.calcAzimuthAltura(ra, dec, lat, sideral)
+
+                self.txtTimeTolimit.setText(observation_time)
+                self.azimuth_cup = azimuth_calc
+                
                 self.bit_status()
                 if "AH" in self.device:
                     self.ah_status()
@@ -293,7 +286,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.thread_manager.start(self.get_prog_status)
 
     @pyqtSlot()
-    def get_prog_status(self):
+    def get_status(self):
         """get statbuf from controller"""
         global statbuf
         statbuf = self.opd_device.progStatus()
@@ -302,62 +295,99 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         """sets the labels colors for each statbit"""
         if len(statbuf)>25:
             if statbuf[15] == "1":
-                self.stat3.setStyleSheet("background-color: lightgreen")
+                self.stat3.setStyleSheet("background-color: darkgreen")
             else:
-                self.stat3.setStyleSheet("background-color: indianred")
+                self.stat3.setStyleSheet("background-color: darkgreen")
             if statbuf[16] == "1":
                 self.stat4.setStyleSheet("background-color: lightgreen")
             else:
-                self.stat4.setStyleSheet("background-color: indianred")
+                self.stat4.setStyleSheet("background-color: darkgreen")
             if statbuf[17] == "1":
                 self.stat5.setStyleSheet("background-color: lightgreen")
                 self.statSecurity.setStyleSheet("background-color: lightgreen")
             else:
-                self.stat5.setStyleSheet("background-color: indianred")
+                self.stat5.setStyleSheet("background-color: darkgreen")
                 self.statSecurity.setStyleSheet("background-color: darkgreen")
             if statbuf[19] == "1":
                 self.stat6.setStyleSheet("background-color: lightgreen")
             else:
-                self.stat6.setStyleSheet("background-color: indianred")
+                self.stat6.setStyleSheet("background-color: darkgreen")
             if statbuf[21] == "1":
                 self.stat7.setStyleSheet("background-color: lightgreen")
                 self.statGross.setStyleSheet("background-color: lightgreen")
             else:
-                self.stat7.setStyleSheet("background-color: indianred")
+                self.stat7.setStyleSheet("background-color: darkgreen")
                 self.statGross.setStyleSheet("background-color: darkgreen")
             if statbuf[22] == "1":
                 self.stat8.setStyleSheet("background-color: lightgreen")
                 self.statGross.setStyleSheet("background-color: lightgreen")
+                self.statDome.setStyleSheet("background-color: darkgreen")
             else:
-                self.stat8.setStyleSheet("background-color: indianred")
+                self.stat8.setStyleSheet("background-color: darkgreen")
                 self.statGross.setStyleSheet("background-color: darkgreen")
+                self.statDome.setStyleSheet("background-color: lightgreen")
             if statbuf[23] == "1":
                 self.stat9.setStyleSheet("background-color: lightgreen")
                 self.statFine.setStyleSheet("background-color: lightgreen")
             else:
-                self.stat9.setStyleSheet("background-color: indianred")
+                self.stat9.setStyleSheet("background-color: darkgreen")
                 self.statFine.setStyleSheet("background-color: darkgreen")
             if statbuf[24] == "1":
                 self.stat10.setStyleSheet("background-color: lightgreen")
             else:
-                self.stat10.setStyleSheet("background-color: indianred")
+                self.stat10.setStyleSheet("background-color: darkgreen")
             if statbuf[25] == "1":
                 self.stat11.setStyleSheet("background-color: lightgreen")
             else:
-                self.stat11.setStyleSheet("background-color: indianred")
+                self.stat11.setStyleSheet("background-color: darkgreen")
             if statbuf[26] == "1":
                 self.stat12.setStyleSheet("background-color: lightgreen")
             else:
-                self.stat12.setStyleSheet("background-color: indianred")
+                self.stat12.setStyleSheet("background-color: darkgreen")
             if statbuf[27] == "1":
                 self.stat13.setStyleSheet("background-color: lightgreen")
             else:
-                self.stat13.setStyleSheet("background-color: indianred")
+                self.stat13.setStyleSheet("background-color: darkgreen")
             if statbuf[23] == "1" and statbuf[25] == "1":
                 self.statRA.setStyleSheet("background-color: darkgreen")
             else:
                 self.statRA.setStyleSheet("background-color: lightgreen")
     
+    def graph_telescope(self):
+        """ilustration of telescope and dome position"""
+
+        az = np.radians(float(self.azimuth_cup))
+        if not az:
+            az = 90
+        self.MplWidget.canvas.axes.clear()
+        self.MplWidget.canvas.axes.set_aspect("auto") 
+        #telescopes
+        u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi/2:10j]
+        x = np.cos(u)*np.sin(v)
+        y = np.sin(u)*np.sin(v)
+        z = np.cos(v)               
+        uu, vv = np.mgrid[az-.305:az+.305:100j, 0:np.pi/2:100j]
+        xx = np.cos(uu)*np.sin(vv)
+        yy = np.sin(uu)*np.sin(vv)
+        zz = np.cos(vv)
+        self.MplWidget.canvas.axes.view_init(20, 270)
+        self.MplWidget.canvas.axes.set_yticklabels([])
+        self.MplWidget.canvas.axes.set_xticklabels([])
+        self.MplWidget.canvas.axes.set_zticklabels([])
+        self.MplWidget.canvas.axes.disable_mouse_rotation()
+        self.MplWidget.canvas.axes.set_facecolor("None")
+        self.MplWidget.canvas.axes.axis("off")
+        self.MplWidget.canvas.figure.subplots_adjust(top=1.1, bottom=-.2)
+        self.MplWidget.canvas.axes.xaxis.set_pane_color((0.0, 1.0, 1.0, 0.0))
+        self.MplWidget.canvas.axes.yaxis.set_pane_color((0.0, 1.0, 1.0, 0.0))
+        self.MplWidget.canvas.axes.zaxis.set_pane_color((0.0, 1.0, 1.0, 0.0))
+        #dome
+        self.MplWidget.canvas.axes.plot_wireframe(y, x, z, color="black", linewidth=0.5)
+        if self.checkBoxDome.isChecked():
+            self.MplWidget.canvas.axes.plot_wireframe(yy, xx, zz, color="yellow", linewidth=0.9, alpha=0.3)
+        
+        self.MplWidget.canvas.draw()
+
     def reset_uc(self):
         try:
             self.opd_device.reset()
@@ -378,13 +408,15 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             minutes = datetime.now().minute
             if minutes < 10:
                 minutes = '0' + str(minutes)
-            print('['+str(hour)+':'+str(minutes)+']Weather T40 data downloaded')
+            # print('['+str(hour)+':'+str(minutes)+']Weather T40 data downloaded')
+            self.txtSysMsg.setText('['+str(hour)+':'+str(minutes)+'] Weather data downloaded')
             original = r'C:\Users\rguargalhone\Documents\downld02.txt'
             target = r'C:\Users\rguargalhone\Documents\weatherData\download.txt'
             shutil.copyfile(original, target)         
         except Exception as e:
             print("Error t40: ", e)
-
+            pass
+    
     def point(self):
         """Points the telescope to a given Target"""
         if "AH" in self.device:
@@ -392,12 +424,17 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             ra_txt = self.txtPointRA.text()
             lst = util.HMSToHours(sid)
             ra = util.HMSToHours(ra_txt)
+            
             ra_txt = util.HoursToHMS(lst - ra, " ", " ", "", 2)
             if len(ra_txt) > 2:
                 try:
                     if statbuf[25] == "0":
                         self.opd_device.sideral_ligar()
-                        self.opd_device.mover_rap(ra_txt)
+                        QtTest.QTest.qWait(100)
+                        if 0.4<(lst - ra) or (lst - ra)<-0.4:
+                            self.opd_device.mover_rap(ra_txt)
+                        else:
+                            self.opd_device.mover_rel("00 00 05")
                     else:
                         print("erro")
 

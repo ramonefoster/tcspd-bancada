@@ -3,14 +3,14 @@ import threading
 import serial.tools.list_ports
 import time
 
-class AxisControll(threading.Thread):
+class AxisControll():
     def __init__(self, device, port, baund):
-        threading.Thread.__init__(self)
         self.porta = port
         self.baundRate = baund
         self.port=self.porta 
         #AH or DEC 
-        self.device = device      
+        self.device = device  
+        self.time_out_device = 2    
 
         self.result = self.com_ports()
 
@@ -20,15 +20,15 @@ class AxisControll(threading.Thread):
             self.ser = serial.Serial(
             port=self.porta,
             baudrate=self.baundRate,
-            timeout=2,
+            timeout=self.time_out_device,
             writeTimeout=1
             )
             self.ser.close()
-            if self.ser.isOpen() == False:
+            if self.ser.is_open == False:
                 try: 
                     self.ser.open()
-                    self.ser.flushOutput()
-                    self.ser.flushInput()
+                    self.ser.reset_output_buffer()
+                    self.ser.reset_input_buffer()
                     self.error_device = False
                 except Exception as e:
                     self.error_device = True                    
@@ -67,7 +67,6 @@ class AxisControll(threading.Thread):
                     return(ack)    
                 else:
                     print("ProgStatus bug")
-                    print(self.porta)
                     return("+0 00 00.00 *0000000000000000")
             except Exception as e:
                 print(e)
@@ -139,30 +138,36 @@ class AxisControll(threading.Thread):
     def write_cmd(self, cmd):
         if not self.error_device and self.ser.is_open:
             try:
-                self.ser.reset_input_buffer()
+                self.ser.flush()
                 self.ser.reset_output_buffer()
+                self.ser.reset_input_buffer()
+                print(cmd)
                 self.ser.write(cmd.encode())
                 ack = ''
-                # time.sleep(.01)
+                t0 = time.time()
                 while '\r' not in ack:
                     ack += self.ser.read().decode()
-                    if (len(ack) == 0) or 'NAK' in ack:
+                    if (time.time() - t0) > self.time_out_device:
+                        self.ser.cancel_read()
+                        self.ser.cancel_write()
+                    # if (len(ack) < 3) or 'NAK' in ack:
                         self.ser.flush()
                         self.ser.reset_input_buffer()
                         self.ser.reset_output_buffer()
-                        self.ser.cancel_read()
-                        self.ser.cancel_write()
-                        return ack.replace('\r', '')
+                        print("serial timeout", ack)
+                        
+                    #     break
+                        return ack
                 print("statbuf: "+ack)    
                 return ack.replace('\r', '')
             except Exception as e:
-                print("######### ERROR COM #########")
-                print(e)
-                print("#############################")
+                print("error writing COM: ", e)
+                self.ser.cancel_read()
+                self.ser.cancel_write()
                 return('NAK')
         else:
             return('NAK')
 
 
-axis_thread = threading.Thread(target = AxisControll, args=[0, 0])
+axis_thread = threading.Thread(target = AxisControll, args=[0, 0, 0])
 axis_thread.start()
