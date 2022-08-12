@@ -2,6 +2,7 @@ import serial
 import threading
 import serial.tools.list_ports
 import time
+from PyQt5 import QtTest
 
 class AxisControll():
     def __init__(self, device, port, baund):
@@ -88,16 +89,25 @@ class AxisControll():
                 stat = True
             else:
                 stat = False
-            return stat                  
+            return stat   
 
-    def prog_error(self):
+    def girar_vel(self, velocidade):
         if not self.error_device:
-            ret = 'ACK' in self.write_cmd(self.device+" PROG ERROS\r")
+            ret = 'ACK' in self.write_cmd(self.device+" EIXO GIRAR_VEL = " + str(velocidade) + "\r")
             if ret:
                 stat = True
             else:
                 stat = False
-            return stat 
+            return stat                  
+
+    def prog_error(self):
+        if not self.error_device:
+            ret = self.write_cmd(self.device+" PROG ERROS\r")
+            if ret:
+                stat = True
+            else:
+                stat = False
+            return ret 
                     
     def prog_parar(self):
         if not self.error_device:
@@ -139,6 +149,7 @@ class AxisControll():
         if not self.error_device and self.ser.is_open:
             try:
                 self.ser.flush()
+                QtTest.QTest.qWait(250)
                 self.ser.reset_output_buffer()
                 self.ser.reset_input_buffer()
                 print(cmd)
@@ -148,10 +159,7 @@ class AxisControll():
                 while '\r' not in ack:
                     ack += self.ser.read().decode()
                     if (time.time() - t0) > self.time_out_device:
-                        self.ser.cancel_read()
-                        self.ser.cancel_write()
                     # if (len(ack) < 3) or 'NAK' in ack:
-                        self.ser.flush()
                         self.ser.reset_input_buffer()
                         self.ser.reset_output_buffer()
                         print("serial timeout", ack)

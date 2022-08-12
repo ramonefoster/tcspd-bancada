@@ -40,10 +40,15 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.thread_manager = QThreadPool()
 
+        """Precess e point"""
         self.btnPoint.clicked.connect(self.point)
         self.btnPrecessP.clicked.connect(self.precess)
         self.btnAbort.clicked.connect(self.stop)
         self.btnReset.clicked.connect(self.reset_uc)
+
+        """Manete"""
+        self.btnWest.clicked.connect(self.move_west)
+        self.btnEast.clicked.connect(self.move_east)
 
         global ss
         ss = self.txtPointRA.styleSheet() #original saved
@@ -52,7 +57,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.device = None
         self.opd_device = None
         self.azimuth_cup = 0
-        self.graph_telescope()
+        self.graph_telescope(15,15)
 
         self.load_allsky()
         self.btnPrecess.clicked.connect(self.select_to_precess)
@@ -64,6 +69,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.timer_update = QTimer()
         self.download_weather()
         self.update_weather()
+        self.load_bsc_default()
                 
     def start_timer(self):
         self.timer_update.timeout.connect(self.update_data)
@@ -218,6 +224,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.txtUmid.setText(humidity)
         self.txtWind.setText(windspeed)
         self.txtDew.setText(dew)
+        self.txtBar.setText(bar_w)
         self.txtWindDir.setText(wind_dir)
         """if humidity is higher than 90%, closes shutter"""
         if float(humidity) > 90:
@@ -250,11 +257,12 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # #DATA
         self.get_status()
-        self.graph_telescope()
+        self.update_weather()
+        
         if statbuf:            
             if "*" in statbuf:
                 ha = statbuf[0:11]
-                dec = self.txtPointDEC.text()
+                dec = self.txtTargetDEC.text()
                 lat = '-22:32:04'
                 sideral, utc = self.get_sidereal()
                 self.encHA.setText(ha)
@@ -266,8 +274,11 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 zenith, is_altitude_ok, azimuth_calc, observation_time, is_observable, \
                 is_pier_west, airmass = Telescope.PointCalculations.calcAzimuthAltura(ra, dec, lat, sideral)
 
+                self.graph_telescope(zenith, azimuth_calc)
+
                 self.txtTimeTolimit.setText(observation_time)
                 self.azimuth_cup = azimuth_calc
+                self.txtPointAirmass.setText(str(airmass))
                 
                 self.bit_status()
                 if "AH" in self.device:
@@ -279,6 +290,16 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             self.sliderTrack.setValue(1)
         else:
             self.sliderTrack.setValue(0)
+
+    def move_west(self):
+        vel = self.boxVelMas.value()
+        if statbuf[16] == "0":
+            self.opd_device.girar_vel(vel)
+    
+    def move_east(self):
+        vel = -1*self.boxVelMas.value()
+        if statbuf[16] == "0":
+            self.opd_device.girar_vel(vel)
 
     @pyqtSlot()
     def get_status(self):
@@ -292,10 +313,17 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         statbuf = self.opd_device.progStatus()
 
     def bit_status(self):
+        hour = datetime.now().hour
+        minutes = datetime.now().minute
+        if minutes < 10:
+            minutes = '0' + str(minutes)
         """sets the labels colors for each statbit"""
         if len(statbuf)>25:
             if statbuf[15] == "1":
-                self.stat3.setStyleSheet("background-color: darkgreen")
+                self.stat3.setStyleSheet("background-color: lightgreen")
+                if statbuf[16] == "0":
+                    error = self.opd_device.prog_error()
+                    self.txtSysMsg.append('['+str(hour)+':'+str(minutes)+'] Error - ' + error)
             else:
                 self.stat3.setStyleSheet("background-color: darkgreen")
             if statbuf[16] == "1":
@@ -353,9 +381,16 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
             else:
                 self.statRA.setStyleSheet("background-color: lightgreen")
     
-    def graph_telescope(self):
+    def graph_telescope(self, zenith,azimuth):
         """ilustration of telescope and dome position"""
-
+        theta = np.radians(float(zenith))
+        phi = np.radians(float(azimuth))
+        X = np.sin(theta) * np.cos(phi)
+        Y = np.sin(theta) * np.sin(phi)
+        Z = np.cos(theta)
+        X = float(X)
+        Y = float(Y)
+        Z = float(Z)
         az = np.radians(float(self.azimuth_cup))
         if not az:
             az = 90
@@ -381,6 +416,9 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.MplWidget.canvas.axes.xaxis.set_pane_color((0.0, 1.0, 1.0, 0.0))
         self.MplWidget.canvas.axes.yaxis.set_pane_color((0.0, 1.0, 1.0, 0.0))
         self.MplWidget.canvas.axes.zaxis.set_pane_color((0.0, 1.0, 1.0, 0.0))
+        #telescope
+        self.MplWidget.canvas.axes.quiver(0,0,0,Y,X,Z,color="red",length=1.0,arrow_length_ratio=.15,linewidths=6.5)
+
         #dome
         self.MplWidget.canvas.axes.plot_wireframe(y, x, z, color="black", linewidth=0.5)
         if self.checkBoxDome.isChecked():
@@ -421,9 +459,10 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         """Points the telescope to a given Target"""
         if "AH" in self.device:
             sid, utc = self.get_sidereal()            
-            ra_txt = self.txtPointRA.text()
+            ra_txt = self.txtTargetRA.text()
             lst = util.HMSToHours(sid)
             ra = util.HMSToHours(ra_txt)
+            self.encDEC.setText(self.txtTargetDEC.text())
             
             ra_txt = util.HoursToHMS(lst - ra, " ", " ", "", 2)
             if len(ra_txt) > 2:
@@ -434,7 +473,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                         if 0.4<(lst - ra) or (lst - ra)<-0.4:
                             self.opd_device.mover_rap(ra_txt)
                         else:
-                            self.opd_device.mover_rel("00 00 05")
+                            self.opd_device.mover_rel("00 00 10")
                     else:
                         print("erro")
 
@@ -444,7 +483,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
                 msg = "Ivalid RA"
                 self.show_dialog(msg)
         elif "DEC" in self.device:
-            dect_txt = self.txtPointDEC.text()
+            dect_txt = self.txtTargetDEC.text()
             if len(dect_txt) > 2:
                 try:
                     if statbuf[25] == "0":
