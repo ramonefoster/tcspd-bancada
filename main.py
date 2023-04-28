@@ -1,4 +1,3 @@
-from pickle import TRUE
 import ephem
 import re
 import sys, os
@@ -10,7 +9,6 @@ import win32gui
 import win32con
 from datetime import datetime, timedelta
 import threading
-import cv2
 import numpy as np
 import serial.tools.list_ports
 from mpl_toolkits.mplot3d import Axes3D
@@ -75,7 +73,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         self.timer_update.timeout.connect(self.update_data)
         self.timer_update.stop()
         self.timer_update.start(1000)
-        self.device = "AH"
+        self.device = self.boxDevice.currentText()
         self.opd_device = AxisDevice.AxisControll(self.device, 'COM7', 9600)
         self.encDEC.setText('-22:32:04')
         self.statDEC.setStyleSheet("background-color: lightgreen")
@@ -261,15 +259,21 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         
         if statbuf:            
             if "*" in statbuf:
-                ha = statbuf[0:11]
-                dec = self.txtTargetDEC.text()
                 lat = '-22:32:04'
                 sideral, utc = self.get_sidereal()
-                self.encHA.setText(ha)
-                HA = util.HMSToHours(ha)
-                lst = util.HMSToHours(sideral)
-                ra = util.HoursToHMS((lst-HA), " ", " ", "", 2)
-                self.encRA.setText(ra)
+                if "AH" in self.device:
+                    ha = statbuf[0:11]
+                    dec = self.txtTargetDEC.text()
+                    self.encHA.setText(ha)
+                    HA = util.HMSToHours(ha)
+                    lst = util.HMSToHours(sideral)
+                    ra = util.HoursToHMS((lst-HA)%24, " ", " ", "", 2)
+                    self.encRA.setText(ra)
+                elif "DEC" in self.device:
+                    dec = statbuf[0:11]
+                    ra = self.txtTargetRA.text()                
+                    self.encDEC.setText(dec)                    
+                    self.encRA.setText(ra)
                 
                 zenith, is_altitude_ok, azimuth_calc, observation_time, is_observable, \
                 is_pier_west, airmass = Telescope.PointCalculations.calcAzimuthAltura(ra, dec, lat, sideral)
@@ -505,7 +509,9 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
         close = close.exec()
 
         if close == QMessageBox.Yes:
-            self.disconnect_device()
+            self.reset_uc()
+            QtTest.QTest.qWait(500)
+            self.opd_device.close_port()
             event.accept()
         else:
             event.ignore()

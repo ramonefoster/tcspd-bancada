@@ -2893,7 +2893,7 @@ INCLINATION</string>
       <x>870</x>
       <y>10</y>
       <width>101</width>
-      <height>31</height>
+      <height>30</height>
      </rect>
     </property>
     <property name="font">
@@ -2932,6 +2932,47 @@ INCLINATION</string>
     <property name="alignment">
      <set>Qt::AlignCenter</set>
     </property>
+   </widget>
+   <widget class="QComboBox" name="boxDevice">
+    <property name="geometry">
+     <rect>
+      <x>800</x>
+      <y>10</y>
+      <width>61</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="layoutDirection">
+     <enum>Qt::LeftToRight</enum>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: lightgrey</string>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>20</width>
+      <height>16</height>
+     </size>
+    </property>
+    <property name="frame">
+     <bool>true</bool>
+    </property>
+    <item>
+     <property name="text">
+      <string>AH</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>DEC</string>
+     </property>
+    </item>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">

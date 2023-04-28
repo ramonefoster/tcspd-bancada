@@ -17,6 +17,12 @@ class TelescopeData():
 
         #calculates HA
         telHA = telLST - telRa
+        telHA = 0.2618*(telLST - telRa)
+        if telHA > math.pi:
+            telHA -= 2 * math.pi
+        if telHA < -math.pi:
+            telHA += 2 * math.pi
+        telHA = telHA/0.2618
 
         #convert format        
         raCoord = util.HoursToHMS(telRa, " ", " ", "", 2)

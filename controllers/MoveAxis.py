@@ -162,8 +162,7 @@ class AxisControll():
                     # if (len(ack) < 3) or 'NAK' in ack:
                         self.ser.reset_input_buffer()
                         self.ser.reset_output_buffer()
-                        print("serial timeout", ack)
-                        
+                        print("serial timeout", ack)                        
                     #     break
                         return ack
                 print("statbuf: "+ack)    
